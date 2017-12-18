@@ -66,9 +66,19 @@ public class V3PGReplicationStream implements PGReplicationStream {
     checkClose();
 
     ByteBuffer payload = null;
-    while (payload == null && copyDual.isActive()) {
+    if (
+        payload == null &&
+        copyDual.isActive()) {
+      LOGGER.log(Level.FINEST, "jklukas: read loop with {0}, {1}",
+          new Object[]{payload == null, copyDual.isActive()});
       payload = readInternal(true);
     }
+
+//    if (payload == null) {
+//      copyDual.endCopy();
+//    }
+
+    LOGGER.log(Level.FINEST, "jklukas: read returning");
 
     return payload;
   }
@@ -117,17 +127,28 @@ public class V3PGReplicationStream implements PGReplicationStream {
   private ByteBuffer readInternal(boolean block) throws SQLException {
     boolean updateStatusRequired = false;
     while (copyDual.isActive()) {
-      if (updateStatusRequired || isTimeUpdate()) {
+
+//      if (updateStatusRequired) {
+//        close();
+//      }
+
+      //if (updateStatusRequired || isTimeUpdate()) {
+      if (isTimeUpdate()) {
         timeUpdateStatus();
       }
 
+      LOGGER.finest("Now we shall receive next data");
       ByteBuffer buffer = receiveNextData(block);
 
       if (buffer == null) {
+        LOGGER.finest("Buffer is null");
         return null;
       }
 
       int code = buffer.get();
+
+      LOGGER.log(Level.FINEST, "jklukas: readInternal with {0}, {1}, {2}",
+          new Object[]{code, updateStatusRequired, isTimeUpdate()});
 
       switch (code) {
 
@@ -188,6 +209,7 @@ public class V3PGReplicationStream implements PGReplicationStream {
     byte[] reply = prepareUpdateStatus(received, flushed, applied, replyRequired);
     copyDual.writeToCopy(reply, 0, reply.length);
     copyDual.flushCopy();
+    LOGGER.log(Level.FINEST, "Called flushCopy");
 
     lastStatusUpdate = System.currentTimeMillis();
   }
@@ -222,6 +244,7 @@ public class V3PGReplicationStream implements PGReplicationStream {
 
   private boolean processKeepAliveMessage(ByteBuffer buffer) {
     lastServerLSN = LogSequenceNumber.valueOf(buffer.getLong());
+    lastReceiveLSN = lastServerLSN;
 
     long lastServerClock = buffer.getLong();
 

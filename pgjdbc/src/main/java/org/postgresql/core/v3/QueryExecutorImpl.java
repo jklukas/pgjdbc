@@ -1055,6 +1055,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     while (!endReceiving && (block || pgStream.hasMessagePending())) {
 
+      LOGGER.log(Level.FINEST, "jklukas: We have a message: {0}", pgStream.peekChar());
+
       // There is a bug in the server's implementation of the copy
       // protocol. It returns command complete immediately upon
       // receiving the EOF marker in the binary protocol,
@@ -1067,8 +1069,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
         int c = pgStream.peekChar();
         if (c == 'C') {
           // CommandComplete
-          LOGGER.log(Level.FINEST, " <=BE CommandStatus, Ignored until CopyDone");
-          break;
+          LOGGER.log(Level.FINEST, " <=BE CommandStatus, Ignored until CopyDone; jk!");
+          //break;
         }
       }
 
