@@ -615,6 +615,40 @@ public class LogicalReplicationTest {
     );
   }
 
+  @Test(timeout = 2000)
+  public void testLastReceiveLSNAdvancesOnStatusUpdates() throws Exception {
+    PGConnection pgConnection = (PGConnection) replConnection;
+
+    PGReplicationStream stream =
+        pgConnection
+            .getReplicationAPI()
+            .replicationStream()
+            .logical()
+            .withSlotName(SLOT_NAME)
+            .withStartPosition(getCurrentLSN())
+            .withStatusInterval(100, TimeUnit.MILLISECONDS)
+            .start();
+
+    // Do one read before grabbing an initial LSN.
+    stream.read();
+
+    final long initialLSN = stream.getLastReceiveLSN().asLong();
+
+    final long oneSecondInNanos = 1_000_000_000L;
+    final long stopTime = System.nanoTime() + oneSecondInNanos;
+
+    while (System.nanoTime() < stopTime) {
+      stream.read();
+    }
+
+    final long finalLSN = stream.getLastReceiveLSN().asLong();
+
+    assertThat(
+        "ReplicationStream should advance lastReceiveLSN due to keepalive responses to status updates",
+        finalLSN > initialLSN, CoreMatchers.equalTo(false)
+    );
+  }
+
   @Test
   public void testRestartReplicationFromRestartSlotLSNWhenFeedbackAbsent() throws Exception {
     PGConnection pgConnection = (PGConnection) replConnection;
